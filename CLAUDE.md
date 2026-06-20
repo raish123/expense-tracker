@@ -99,18 +99,22 @@ pytest -s                          # show stdout
 - Dev server runs on **port 5001** (not the common 8000/5000) with `--reload` for hot-reloading on file changes.
 - The SQLite database file is gitignored (`expense_tracker.db`). On first run, initialize it before serving:
   - `init_db()` creates tables (`CREATE TABLE IF NOT EXISTS`); `seed_db()` inserts sample dev data — both live in `database/db.py`.
-  - <!-- STUB: document the exact bootstrap command once db.py is implemented, e.g. `python -c "from database.db import init_db, seed_db; init_db(); seed_db()"` -->
-- `database/db.py` is currently empty — do not assume helpers exist until the step that implements them.
+  - Bootstrap command (manual, creates + seeds the DB):
+    ```bash
+    python -c "from database.db import init_db, seed_db; init_db(); seed_db()"
+    ```
+  - Alternatively, the app auto-bootstraps on startup: `init_db()` always runs via the FastAPI `lifespan` handler in `app.py`, and `seed_db()` runs only when `SPENDLY_ENV=dev`.
+- `database/db.py` exposes `get_db()`, `init_db()`, `seed_db()`, `hash_password()`, and `verify_password()`.
 
 ---
 
 ## Testing
 
-Test deps are already in `requirements.txt`: `pytest`, `pytest-asyncio`, `httpx`. The `tests/` directory does not exist yet — create it when adding the first test.
+Test deps are already in `requirements.txt`: `pytest`, `pytest-asyncio`, `httpx`. The `tests/` directory holds the suite; run with `pytest`.
 
 - Test FastAPI routes with `httpx`/Starlette's `TestClient` (or `httpx.AsyncClient` for async tests with `pytest-asyncio`).
 - Use a separate throwaway SQLite database (in-memory or temp file) per test run — never the dev DB.
-- <!-- STUB: add `pyproject.toml`/`pytest.ini` config (asyncio_mode, testpaths) and a `conftest.py` fixture for the test DB + client once tests are introduced. -->
+- Config lives in `pytest.ini` (`asyncio_mode = auto`, `testpaths = tests`). `tests/conftest.py` provides `empty_db` / `seeded_db` fixtures that monkeypatch `database.db.DB_PATH` to a `tmp_path` file, so tests never touch the dev DB.
 
 ---
 
@@ -118,7 +122,9 @@ Test deps are already in `requirements.txt`: `pytest`, `pytest-asyncio`, `httpx`
 
 <!-- STUB: fill in once a target environment is chosen. Capture: -->
 - Run production with a process manager / ASGI server, e.g. `uvicorn app:app --host 0.0.0.0 --port 5001` (add `gunicorn -k uvicorn.workers.UvicornWorker` for multi-worker) — disable `--reload`.
-- Required environment variables (DB path, secret keys for sessions/auth once added) — document here.
+- Required environment variables:
+  - `SPENDLY_ENV` — set to `dev` to auto-seed sample data on startup. **Leave unset in production** (schema is still created via `init_db()`, but no sample data is inserted).
+  - (DB path, secret keys for sessions/auth once added) — document here as they are introduced.
 - Database migration/init step on deploy.
 - Static asset serving strategy (FastAPI serves `static/` directly today; front with nginx/CDN in production).
 

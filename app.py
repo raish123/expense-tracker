@@ -1,9 +1,25 @@
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-app = FastAPI()
+from database.db import init_db, seed_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Schema creation is idempotent and always safe to run on startup.
+    init_db()
+    # Sample data is dev-only — never auto-seed in production.
+    if os.getenv("SPENDLY_ENV") == "dev":
+        seed_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
