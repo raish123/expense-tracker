@@ -106,7 +106,8 @@ pytest -s                          # show stdout
     python -c "from database.db import init_db, seed_db; init_db(); seed_db()"
     ```
   - Alternatively, the app auto-bootstraps on startup: `init_db()` always runs via the FastAPI `lifespan` handler in `app.py`, and `seed_db()` runs only when `SPENDLY_ENV=dev`.
-- `database/db.py` exposes `get_db()`, `init_db()`, `seed_db()`, `seed_dummy_data()`, `hash_password()`, and `verify_password()`.
+- `database/db.py` exposes `get_db()`, `init_db()`, `seed_db()`, `seed_dummy_data()`, `hash_password()`, `verify_password()`, `create_user()`, and `get_user_by_email()`.
+  - `create_user(name, email, password) -> int` hashes the password and inserts a `users` row (returns the new id; raises `sqlite3.IntegrityError` on duplicate email). `get_user_by_email(email) -> sqlite3.Row | None` is the lookup used by registration's duplicate check and by the upcoming login step.
   - `seed_dummy_data(num_users=5, expenses_per_user=8)` populates fabricated dev users + expenses; idempotent (skips existing users by email). Run it via the `/seed-dummy-data` command or `python scripts/seed_dummy.py [users=N] [expenses-per-user=M]`.
 
 ---
@@ -115,9 +116,11 @@ pytest -s                          # show stdout
 
 Test deps are already in `requirements.txt`: `pytest`, `pytest-asyncio`, `httpx`. The `tests/` directory holds the suite; run with `pytest`.
 
-- Test FastAPI routes with `httpx`/Starlette's `TestClient` (or `httpx.AsyncClient` for async tests with `pytest-asyncio`).
+- Test FastAPI routes with `httpx.AsyncClient` over `httpx.ASGITransport(app=app)` for async tests (auto-run under `asyncio_mode = auto`). Pass `follow_redirects=False` when asserting a redirect status (e.g. the `POST /register` 303).
+  - **Caveat:** Starlette's `TestClient` currently does **not** work in this environment — the installed `starlette`/`fastapi` (0.36.x / 0.110.x) predate the pinned versions in `requirements.txt` and that older `TestClient` is incompatible with the installed `httpx` 0.28.1 (raises `TypeError: Client.__init__() got an unexpected keyword argument 'app'`). Prefer `httpx.AsyncClient`. Running `pip install -r requirements.txt` to realign versions would restore `TestClient` compatibility.
 - Use a separate throwaway SQLite database (in-memory or temp file) per test run — never the dev DB.
 - Config lives in `pytest.ini` (`asyncio_mode = auto`, `testpaths = tests`). `tests/conftest.py` provides `empty_db` / `seeded_db` fixtures that monkeypatch `database.db.DB_PATH` to a `tmp_path` file, so tests never touch the dev DB.
+- Registration suite: `tests/test_register.py` (10 tests covering `POST /register` + the two new DB helpers).
 
 ---
 
@@ -138,7 +141,8 @@ Test deps are already in `requirements.txt`: `pytest`, `pytest-asyncio`, `httpx`
 | Route | Status |
 |---|---|
 | `GET /` | Implemented — renders `landing.html` |
-| `GET /register` | Implemented — renders `register.html` (POST handler pending) |
+| `GET /register` | Implemented — renders `register.html` |
+| `POST /register` | Implemented — validates input, creates user, redirects to `/login?registered=1` |
 | `GET /login` | Implemented — renders `login.html` (POST handler pending) |
 | `GET /terms` | Implemented — renders `terms.html` |
 | `GET /privacy` | Implemented — renders `privacy.html` |
