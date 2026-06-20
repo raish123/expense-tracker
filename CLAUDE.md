@@ -16,7 +16,9 @@ spendly/
 ├── app.py              # FastAPI app + all routes — single file, no routers yet
 ├── database/
 │   ├── __init__.py     # package marker
-│   └── db.py           # SQLite helpers: get_db(), init_db(), seed_db()
+│   └── db.py           # SQLite helpers: get_db(), init_db(), seed_db(), seed_dummy_data()
+├── scripts/            # dev-only one-off scripts (thin callers of db.py helpers)
+│   └── seed_dummy.py   # CLI wrapper for seed_dummy_data() — see /seed-dummy-data
 ├── session/            # historical session/migration notes (reference only)
 ├── templates/
 │   ├── base.html       # Shared layout — all templates must extend this
@@ -104,7 +106,8 @@ pytest -s                          # show stdout
     python -c "from database.db import init_db, seed_db; init_db(); seed_db()"
     ```
   - Alternatively, the app auto-bootstraps on startup: `init_db()` always runs via the FastAPI `lifespan` handler in `app.py`, and `seed_db()` runs only when `SPENDLY_ENV=dev`.
-- `database/db.py` exposes `get_db()`, `init_db()`, `seed_db()`, `hash_password()`, and `verify_password()`.
+- `database/db.py` exposes `get_db()`, `init_db()`, `seed_db()`, `seed_dummy_data()`, `hash_password()`, and `verify_password()`.
+  - `seed_dummy_data(num_users=5, expenses_per_user=8)` populates fabricated dev users + expenses; idempotent (skips existing users by email). Run it via the `/seed-dummy-data` command or `python scripts/seed_dummy.py [users=N] [expenses-per-user=M]`.
 
 ---
 

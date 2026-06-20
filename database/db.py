@@ -11,7 +11,9 @@ All SQL for the application lives in this module (see CLAUDE.md). It exposes:
 import hashlib
 import hmac
 import os
+import random
 import sqlite3
+from datetime import date, timedelta
 from pathlib import Path
 
 # Resolve the DB file relative to the project root (this file's parent's parent),
@@ -114,6 +116,89 @@ def seed_db() -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+# Pools used only by seed_dummy_data() to fabricate believable dev rows.
+_DUMMY_FIRST_NAMES = [
+    "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Sai", "Reyansh", "Ishaan",
+    "Rohan", "Kabir", "Ananya", "Diya", "Saanvi", "Aadhya", "Anika", "Navya",
+    "Myra", "Sara", "Aarohi", "Ira",
+]
+_DUMMY_LAST_NAMES = [
+    "Sharma", "Verma", "Gupta", "Iyer", "Nair", "Reddy", "Patel", "Singh",
+    "Mehta", "Joshi", "Kulkarni", "Bose", "Chopra", "Malhotra", "Desai",
+]
+_DUMMY_CATEGORY_DESCRIPTIONS = {
+    "Food": ["Groceries at BigBazaar", "Lunch with team", "Dinner at restaurant", "Coffee", "Evening snacks"],
+    "Travel": ["Auto fare", "Cab to airport", "Train tickets", "Petrol refill", "Metro card recharge"],
+    "Bills": ["Electricity bill", "Internet bill", "Mobile recharge", "Water bill", "Gas cylinder"],
+    "Shopping": ["Running shoes", "Cotton T-shirt", "Headphones", "Books", "Kitchenware"],
+    "Health": ["Pharmacy", "Doctor consultation", "Gym membership", "Health checkup", "Vitamins"],
+    "Entertainment": ["Movie tickets", "Netflix subscription", "Concert pass", "Bowling night", "Game purchase"],
+    "Other": ["Stationery", "Birthday gift", "Charity donation", "Misc supplies", "Minor repairs"],
+}
+
+
+def seed_dummy_data(num_users: int = 5, expenses_per_user: int = 8) -> dict[str, int]:
+    """Populate the DB with fabricated dev users + expenses. Idempotent & dev-only.
+
+    Existing users (matched by email) are skipped; expenses are only generated
+    for users actually inserted this run, so re-running never piles up rows.
+    Returns a summary: users_inserted, users_skipped, expenses_inserted.
+    """
+    # Build (name, email) pairs deterministically by index so identities are
+    # stable across runs — that is what makes INSERT OR IGNORE below idempotent
+    # (re-running with the same count skips the same users instead of piling up).
+    pairs: list[tuple[str, str]] = []
+    for i in range(num_users):
+        first = _DUMMY_FIRST_NAMES[i % len(_DUMMY_FIRST_NAMES)]
+        last = _DUMMY_LAST_NAMES[(i // len(_DUMMY_FIRST_NAMES)) % len(_DUMMY_LAST_NAMES)]
+        email = f"{first}.{last}.{i + 1}@example.com".lower()
+        pairs.append((f"{first} {last}", email))
+
+    categories = list(_DUMMY_CATEGORY_DESCRIPTIONS)
+    today = date.today()
+
+    users_inserted = 0
+    users_skipped = 0
+    expenses_inserted = 0
+
+    conn = get_db()
+    try:
+        for name, email in pairs:
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+                (name, email, hash_password("password123")),
+            )
+            if cur.rowcount == 0:
+                users_skipped += 1
+                continue
+            users_inserted += 1
+            user_id = cur.lastrowid
+
+            rows = []
+            for _ in range(expenses_per_user):
+                category = random.choice(categories)
+                description = random.choice(_DUMMY_CATEGORY_DESCRIPTIONS[category])
+                amount = round(random.uniform(50, 5000), 2)
+                day = (today - timedelta(days=random.randint(0, 60))).isoformat()
+                rows.append((user_id, amount, category, description, day))
+            conn.executemany(
+                "INSERT INTO expenses (user_id, amount, category, description, date) "
+                "VALUES (?, ?, ?, ?, ?)",
+                rows,
+            )
+            expenses_inserted += len(rows)
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "users_inserted": users_inserted,
+        "users_skipped": users_skipped,
+        "expenses_inserted": expenses_inserted,
+    }
 
 
 def hash_password(password: str) -> str:
