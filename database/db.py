@@ -259,3 +259,35 @@ def verify_password(password: str, stored: str) -> bool:
     )
     # Constant-time comparison to avoid timing leaks.
     return hmac.compare_digest(candidate, expected)
+
+
+def create_user(name: str, email: str, password: str) -> int:
+    """Insert a new user with a hashed password; return the new row id.
+
+    The password is hashed via ``hash_password()`` — plaintext is never stored.
+    ``created_at`` is left to the column default. A duplicate email raises
+    ``sqlite3.IntegrityError`` (UNIQUE constraint), which the caller handles.
+    """
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+            (name, email, hash_password(password)),
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def get_user_by_email(email: str) -> sqlite3.Row | None:
+    """Return the user row for ``email``, or None if no such user exists."""
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT id, name, email, password_hash, created_at "
+            "FROM users WHERE email = ?",
+            (email,),
+        ).fetchone()
+    finally:
+        conn.close()
