@@ -201,6 +201,36 @@ def seed_dummy_data(num_users: int = 5, expenses_per_user: int = 8) -> dict[str,
     }
 
 
+def get_user_by_email(email: str) -> sqlite3.Row | None:
+    """Return the user row matching ``email`` (incl. password_hash), or None.
+
+    Used by the login handler to look up credentials. Parameterized.
+    """
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT id, name, email, password_hash FROM users WHERE email = ?",
+            (email,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def get_user_by_id(user_id: int) -> sqlite3.Row | None:
+    """Return the user row matching ``user_id`` (no password_hash), or None.
+
+    Used to rehydrate the logged-in user from the session cookie.
+    """
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT id, name, email FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
 def hash_password(password: str) -> str:
     """Hash a password with PBKDF2 and a random per-user salt.
 

@@ -129,8 +129,9 @@ Test deps are already in `requirements.txt`: `pytest`, `pytest-asyncio`, `httpx`
 <!-- STUB: fill in once a target environment is chosen. Capture: -->
 - Run production with a process manager / ASGI server, e.g. `uvicorn app:app --host 0.0.0.0 --port 5001` (add `gunicorn -k uvicorn.workers.UvicornWorker` for multi-worker) — disable `--reload`.
 - Required environment variables:
-  - `SPENDLY_ENV` — set to `dev` to auto-seed sample data on startup. **Leave unset in production** (schema is still created via `init_db()`, but no sample data is inserted).
-  - (DB path, secret keys for sessions/auth once added) — document here as they are introduced.
+  - `SPENDLY_ENV` — set to `dev` to auto-seed sample data on startup. **Leave unset in production** (schema is still created via `init_db()`, but no sample data is inserted). Also relaxes the session cookie `secure` flag for local `http://localhost` (set in dev → cookie sent over plain HTTP).
+  - `SPENDLY_SECRET_KEY` — HMAC secret used to sign the `spendly_session` cookie. **Must be set in production**; if unset, the app generates an ephemeral secret at startup and logs a warning, so all sessions are invalidated on every restart. Rotating the key also invalidates existing sessions.
+  - (DB path — document here once introduced.)
 - Database migration/init step on deploy.
 - Static asset serving strategy (FastAPI serves `static/` directly today; front with nginx/CDN in production).
 
@@ -141,12 +142,12 @@ Test deps are already in `requirements.txt`: `pytest`, `pytest-asyncio`, `httpx`
 | Route | Status |
 |---|---|
 | `GET /` | Implemented — renders `landing.html` |
-| `GET /register` | Implemented — renders `register.html` |
-| `POST /register` | Implemented — validates input, creates user, redirects to `/login?registered=1` |
-| `GET /login` | Implemented — renders `login.html` (POST handler pending) |
+| `GET /register` | Implemented — renders `register.html` (POST handler pending) |
+| `GET /login` | Implemented — renders `login.html`; redirects to `/` if already authenticated |
+| `POST /login` | Implemented — verifies credentials, sets signed session cookie, redirects to `/` |
 | `GET /terms` | Implemented — renders `terms.html` |
 | `GET /privacy` | Implemented — renders `privacy.html` |
-| `GET /logout` | Stub — Step 3 |
+| `GET /logout` | Implemented — clears session cookie, redirects to `/` |
 | `GET /profile` | Stub — Step 4 |
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/{id}/edit` | Stub — Step 8 |

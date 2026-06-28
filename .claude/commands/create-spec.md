@@ -29,7 +29,25 @@ If `$ARGUMENTS` is empty, ask the user for the feature name before continuing.
 5. **Final filename:** `.claude/specs/<NNN>-<slug>.md`
    (matches the existing format, e.g. `.claude/specs/001-database-setup.md`).
 
-## Step 2 — Read the rules and the codebase before writing
+## Step 2 — Create and check out a new feature branch
+
+Before writing the spec, create a dedicated git branch for this feature so the
+spec and its eventual implementation live on their own branch.
+
+1. Confirm the working tree is a git repo and check the current state:
+   `git rev-parse --abbrev-ref HEAD` and `git status --porcelain`.
+2. **Branch name:** `feature/<NNN>-<slug>` — reuse the exact `<NNN>` and `<slug>`
+   computed in Step 1 (e.g. `feature/002-login-and-logout`).
+3. Create **and** check out the branch off the current branch in one step:
+   `git checkout -b feature/<NNN>-<slug>`.
+   - If a branch with that name already exists, do **not** overwrite it — switch
+     to it with `git checkout feature/<NNN>-<slug>` instead, and note this in the
+     final output.
+4. Verify you are on the new branch (`git rev-parse --abbrev-ref HEAD`) before
+   proceeding. Do **not** commit or push — only create and switch the branch; the
+   user controls commits.
+
+## Step 3 — Read the rules and the codebase before writing
 
 - **Read `CLAUDE.md`** in full and honor every constraint it states (FastAPI +
   Jinja2 + SQLite only, all SQL in `database/db.py`, parameterized queries,
@@ -53,7 +71,7 @@ If `$ARGUMENTS` is empty, ask the user for the feature name before continuing.
 - If the feature maps to a known stub step in the CLAUDE.md route table
   (e.g. logout, profile, add/edit/delete expense), reference that step.
 
-## Step 3 — Write the specification file
+## Step 4 — Write the specification file
 
 Create the file at the path from Step 1 using `Write`. Use this section
 structure (the same shape as `001-database-setup.md` — keep, drop, or add
@@ -116,11 +134,12 @@ table/column names, real route names, real helper names) — never generic
 placeholder text. The result must be implementation-ready for Product,
 Engineering, QA, Claude Code, Codex, or Cursor to pick up directly.
 
-## Step 4 — Output
+## Step 5 — Output
 
 After writing the file, report to the user in this order:
-1. The **generated filename** (the full `.claude/specs/<NNN>-<slug>.md` path).
-2. The **complete markdown specification document** that was written.
+1. The **branch** that was created and checked out (or reused).
+2. The **generated filename** (the full `.claude/specs/<NNN>-<slug>.md` path).
+3. The **complete markdown specification document** that was written.
 
 ---
 
@@ -135,4 +154,6 @@ After writing the file, report to the user in this order:
   actual codebase — analyze before writing.
 - Prefer reusing/extending existing tables, helpers, routes, templates, and
   scripts over inventing new ones; never duplicate existing functionality.
+- Always create and check out the `feature/<NNN>-<slug>` branch (Step 2) before
+  writing the spec; never commit or push automatically — leave commits to the user.
 - Do not implement the feature — only produce the specification document.
